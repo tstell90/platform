@@ -1,0 +1,75 @@
+name: dbt Build & Test (Reusable)
+
+on:
+  workflow_call:
+    inputs:
+      dbt-command:
+        description: "dbt command to run (e.g. 'build', 'run', 'test')"
+        required: false
+        type: string
+        default: "build"
+      dbt-args:
+        description: "Additional dbt arguments (e.g. '--select tag:daily')"
+        required: false
+        type: string
+        default: ""
+      working-directory:
+        description: "Directory containing dbt_project.yml"
+        required: false
+        type: string
+        default: "dbt"
+      python-version:
+        description: "Python version"
+        required: false
+        type: string
+        default: ""
+      uv-version:
+        description: "uv version to pin"
+        required: false
+        type: string
+        default: "0.10.3"
+      environment:
+        description: "Target environment"
+        required: false
+        type: string
+        default: "dev"
+    secrets:
+      DATABRICKS_HOST:
+        required: true
+      DATABRICKS_TOKEN:
+        required: true
+
+jobs:
+  dbt:
+    name: dbt ${{ inputs.dbt-command }}
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.environment }}
+    defaults:
+      run:
+        working-directory: ${{ inputs.working-directory }}
+    env:
+      DATABRICKS_HOST: ${{ secrets.DATABRICKS_HOST }}
+      DATABRICKS_TOKEN: ${{ secrets.DATABRICKS_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Python + uv
+        uses: tstell90/platform/actions/setup-python-uv@v1
+        with:
+          python-version: ${{ inputs.python-version }}
+          uv-version: ${{ inputs.uv-version }}
+
+      - name: dbt deps
+        run: uv run dbt deps
+
+      - name: dbt ${{ inputs.dbt-command }}
+        run: uv run dbt ${{ inputs.dbt-command }} ${{ inputs.dbt-args }}
+
+      - name: Upload dbt artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: dbt-artifacts
+          path: |
+            ${{ inputs.working-directory }}/target/manifest.json
+            ${{ inputs.working-directory }}/target/run_results.json

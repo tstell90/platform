@@ -1,0 +1,44 @@
+name: "Setup Python + uv"
+description: "Install uv, Python, and sync project dependencies. Eliminates boilerplate across workflows."
+
+inputs:
+  python-version:
+    description: "Python version to install (reads .python-version if empty)"
+    required: false
+    default: ""
+  uv-version:
+    description: "uv version to pin"
+    required: false
+    default: "0.10.3"
+  working-directory:
+    description: "Working directory for the project"
+    required: false
+    default: "."
+  install-args:
+    description: "Extra args for uv sync (e.g. --all-extras)"
+    required: false
+    default: "--all-extras --dev"
+
+runs:
+  using: "composite"
+  steps:
+    - name: Install uv
+      uses: astral-sh/setup-uv@v7
+      with:
+        version: ${{ inputs.uv-version }}
+        enable-cache: true
+
+    - name: Install Python
+      shell: bash
+      working-directory: ${{ inputs.working-directory }}
+      run: |
+        if [ -n "${{ inputs.python-version }}" ]; then
+          uv python install "${{ inputs.python-version }}"
+        else
+          uv python install
+        fi
+
+    - name: Install dependencies
+      shell: bash
+      working-directory: ${{ inputs.working-directory }}
+      run: uv sync --locked ${{ inputs.install-args }}

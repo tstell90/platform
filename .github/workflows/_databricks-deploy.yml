@@ -1,0 +1,52 @@
+name: Databricks Deploy (Reusable)
+
+on:
+  workflow_call:
+    inputs:
+      environment:
+        description: "Target environment (dev, staging, prod)"
+        required: true
+        type: string
+      bundle-target:
+        description: "Databricks Asset Bundle target name (defaults to environment name)"
+        required: false
+        type: string
+        default: ""
+      working-directory:
+        description: "Working directory containing databricks.yml"
+        required: false
+        type: string
+        default: "."
+    secrets:
+      DATABRICKS_HOST:
+        required: true
+      DATABRICKS_TOKEN:
+        required: true
+
+jobs:
+  deploy:
+    name: Deploy to ${{ inputs.environment }}
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.environment }}
+    defaults:
+      run:
+        working-directory: ${{ inputs.working-directory }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Databricks CLI
+        uses: databricks/setup-cli@main
+
+      - name: Configure Databricks auth
+        run: |
+          cat > ~/.databrickscfg <<EOF
+          [DEFAULT]
+          host = ${{ secrets.DATABRICKS_HOST }}
+          token = ${{ secrets.DATABRICKS_TOKEN }}
+          EOF
+
+      - name: Validate bundle
+        run: databricks bundle validate -t ${{ inputs.bundle-target || inputs.environment }}
+
+      - name: Deploy bundle
+        run: databricks bundle deploy -t ${{ inputs.bundle-target || inputs.environment }}
